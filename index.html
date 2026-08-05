@@ -24,13 +24,22 @@
   <div id="checkModal" class="modal" aria-hidden="true">
     <section class="check-window" role="dialog" aria-modal="true" aria-labelledby="checkTitle">
       <header class="check-window-head">
-        <div>
+        <div class="check-title-area">
           <strong id="checkTitle">장기 체크리스트</strong>
           <small>날짜와 관계없이 계속 보관되는 업무</small>
         </div>
-        <button id="closeChecklist" class="close-button" aria-label="닫기">×</button>
+        <div class="check-window-actions" aria-label="체크리스트 출력">
+          <button id="checkJpg">JPG</button>
+          <button id="checkPdf">PDF</button>
+          <button id="checkPrint">인쇄</button>
+          <button id="closeChecklist" class="close-button" aria-label="닫기">×</button>
+        </div>
       </header>
-      <div class="check-columns"><div>등록일</div><div>업무 내용</div><div>진행상황</div></div>
+      <div class="check-columns">
+        <div>등록일</div>
+        <div>업무 내용</div>
+        <div>진행상황</div>
+      </div>
       <div id="checkItems" class="check-items"></div>
     </section>
   </div>
