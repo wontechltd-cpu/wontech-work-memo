@@ -1,4 +1,3 @@
-
 const $=s=>document.querySelector(s), days=$('#days');
 const {workDate,shiftDate,dateRangeExclusive}=window.WorkDate;
 let visible=30, active, renderedWorkDate=workDate();
@@ -332,6 +331,9 @@ $('#add').onclick=()=>{
   addTask(workDate());
 };
 $('#checklist').onclick=openChecklist;
+$('#checkJpg').onclick=e=>{e.stopPropagation();output(window.desk.jpg);};
+$('#checkPdf').onclick=e=>{e.stopPropagation();output(window.desk.pdf);};
+$('#checkPrint').onclick=e=>{e.stopPropagation();output(window.desk.print);};
 $('#closeChecklist').onclick=closeChecklist;
 $('#checkModal').onclick=e=>{
   if(e.target===$('#checkModal'))closeChecklist();
