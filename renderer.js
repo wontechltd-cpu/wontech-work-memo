@@ -2,6 +2,70 @@ const $=s=>document.querySelector(s), days=$('#days');
 const {workDate,shiftDate,dateRangeExclusive}=window.WorkDate;
 let visible=30, active, renderedWorkDate=workDate();
 const shift=shiftDate;
+const LOGO_KEY='wontech:companyLogo';
+
+function defaultLogoSrc(){
+  return new URL('assets/wontech-logo.jpg',location.href).href;
+}
+
+function currentLogoSrc(){
+  return localStorage.getItem(LOGO_KEY)||defaultLogoSrc();
+}
+
+function applyCurrentLogo(){
+  const src=currentLogoSrc();
+  document.querySelectorAll('.brand-logo').forEach(img=>{img.src=src;});
+}
+
+async function resizeLogoFile(file){
+  if(!file||!file.type.startsWith('image/')){
+    throw new Error('이미지 파일만 선택할 수 있습니다.');
+  }
+  if(file.size>15*1024*1024){
+    throw new Error('15MB 이하의 이미지 파일을 선택해 주세요.');
+  }
+
+  const source=await new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(reader.result);
+    reader.onerror=()=>reject(new Error('이미지 파일을 읽지 못했습니다.'));
+    reader.readAsDataURL(file);
+  });
+
+  const image=await new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>resolve(img);
+    img.onerror=()=>reject(new Error('이미지를 불러오지 못했습니다.'));
+    img.src=source;
+  });
+
+  const maxWidth=1200;
+  const maxHeight=360;
+  const scale=Math.min(1,maxWidth/image.naturalWidth,maxHeight/image.naturalHeight);
+  const width=Math.max(1,Math.round(image.naturalWidth*scale));
+  const height=Math.max(1,Math.round(image.naturalHeight*scale));
+  const canvas=document.createElement('canvas');
+  canvas.width=width;
+  canvas.height=height;
+  const context=canvas.getContext('2d');
+  context.clearRect(0,0,width,height);
+  context.drawImage(image,0,0,width,height);
+  return canvas.toDataURL('image/png');
+}
+
+async function changeCompanyLogo(file){
+  try{
+    const dataUrl=await resizeLogoFile(file);
+    localStorage.setItem(LOGO_KEY,dataUrl);
+    applyCurrentLogo();
+    showToast('회사마크를 교체했습니다.');
+  }catch(error){
+    console.error(error);
+    showToast(error.message||'회사마크를 교체하지 못했습니다.');
+  }finally{
+    $('#logoFile').value='';
+  }
+}
 
 function label(key){
   const d=new Date(key+'T12:00:00');
@@ -74,7 +138,7 @@ function makeDay(k){
   s.dataset.date=k;
   s.innerHTML=`
     <div class="brand">
-      <img class="brand-logo" src="assets/wontech-logo.jpg" alt="WONTECH 원테크">
+      <img class="brand-logo" src="${currentLogoSrc()}" alt="회사마크">
       <div class="date">DATE ${label(k)}</div>
     </div>
     <div class="head">
@@ -247,7 +311,7 @@ function printableDayHtml(k=active||workDate()){
 
   clone.querySelectorAll('.remove,.footer-actions').forEach(x=>x.remove());
   const logo=clone.querySelector('.brand-logo');
-  if(logo)logo.src=new URL('assets/wontech-logo.jpg',location.href).href;
+  if(logo)logo.src=currentLogoSrc();
   return clone.outerHTML;
 }
 
@@ -264,7 +328,7 @@ function printableChecklistHtml(){
   return `
     <section class="print-checklist">
       <div class="brand">
-        <img class="brand-logo" src="${new URL('assets/wontech-logo.jpg',location.href).href}" alt="WONTECH 원테크">
+        <img class="brand-logo" src="${currentLogoSrc()}" alt="회사마크">
         <div class="date">장기 체크리스트</div>
       </div>
       <div class="print-check-head"><div>NO</div><div>등록일</div><div>업무 내용</div><div>진행상황</div></div>
@@ -314,6 +378,7 @@ function refreshAtDateBoundary(){
 
 rolloverThrough();
 render();
+applyCurrentLogo();
 go(workDate());
 
 setInterval(refreshAtDateBoundary,30000);
@@ -331,6 +396,8 @@ $('#add').onclick=()=>{
   addTask(workDate());
 };
 $('#checklist').onclick=openChecklist;
+$('#changeLogo').onclick=()=>$('#logoFile').click();
+$('#logoFile').onchange=e=>changeCompanyLogo(e.target.files?.[0]);
 $('#checkJpg').onclick=e=>{e.stopPropagation();output(window.desk.jpg);};
 $('#checkPdf').onclick=e=>{e.stopPropagation();output(window.desk.pdf);};
 $('#checkPrint').onclick=e=>{e.stopPropagation();output(window.desk.print);};
