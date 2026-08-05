@@ -4,7 +4,7 @@ body{margin:0;background:#d9dde1;font-size:12px}
 button,select,input{font-family:inherit}
 
 .toolbar{
-  position:sticky;top:0;z-index:20;display:flex;gap:3px;align-items:center;
+  position:sticky;top:0;z-index:20;display:flex;gap:3px;align-items:center;flex-wrap:wrap;
   padding:6px;background:#253746;color:white;box-shadow:0 2px 8px #0004
 }
 .toolbar button{
@@ -13,6 +13,7 @@ button,select,input{font-family:inherit}
 }
 .toolbar button:hover{background:#eaf2f7}
 .toolbar label{margin-left:auto;white-space:nowrap;font-size:10px}
+.file-input{display:none}
 
 .sheet{
   width:calc(100% - 12px);min-height:430px;margin:8px auto;background:#fff;
