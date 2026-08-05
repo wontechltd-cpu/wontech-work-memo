@@ -68,11 +68,18 @@ button,select,input{font-family:inherit}
   display:flex;flex-direction:column
 }
 .check-window-head{
-  display:flex;align-items:center;justify-content:space-between;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
   padding:14px 16px;background:#253746;color:#fff
 }
+.check-title-area{min-width:0}
 .check-window-head strong{display:block;font-size:18px}
 .check-window-head small{display:block;margin-top:3px;opacity:.8}
+.check-window-actions{display:flex;align-items:center;gap:5px;flex-shrink:0}
+.check-window-actions button:not(.close-button){
+  border:0;border-radius:5px;padding:6px 9px;background:#fff;color:#18364d;
+  font-size:11px;font-weight:800;cursor:pointer
+}
+.check-window-actions button:not(.close-button):hover{background:#eaf2f7}
 .close-button{
   width:32px;height:32px;border:0;border-radius:50%;font-size:24px;
   line-height:26px;background:#fff;color:#253746;cursor:pointer
@@ -84,9 +91,13 @@ button,select,input{font-family:inherit}
   min-height:38px;background:#f5f2e9;border-bottom:2px solid #253746;
   font-weight:800;text-align:center
 }
-.check-columns>*:not(:last-child),.check-row>*:not(:last-child){
-  border-right:1px solid #ddd;height:100%;display:flex;align-items:center
+.check-columns>div{
+  height:100%;display:flex;align-items:center;justify-content:center;text-align:center
 }
+.check-columns>div:not(:last-child),.check-row>*:not(:last-child){
+  border-right:1px solid #ddd
+}
+.check-row>*:not(:last-child){height:100%;display:flex;align-items:center}
 .check-items{overflow:auto;flex:1}
 .check-row{min-height:42px;border-bottom:1px solid #ddd}
 .check-row.check-pending{background:#fff8e8;border-left:5px solid #e4a72b}
@@ -107,3 +118,9 @@ button,select,input{font-family:inherit}
   display:grid;grid-template-columns:12mm 28mm 1fr 25mm;
 }
 .print-check-head{font-weight:800;background:#f3f3f3}
+
+@media(max-width:620px){
+  .check-window-head{align-items:flex-start}
+  .check-window-actions{flex-wrap:wrap;justify-content:flex-end}
+  .check-window-actions button:not(.close-button){padding:5px 7px}
+}
