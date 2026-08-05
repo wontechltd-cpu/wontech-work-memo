@@ -1,3 +1,43 @@
-<!doctype html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width"><title>WONTECH 업무메모</title><link rel="stylesheet" href="style.css"></head><body>
-<header class="toolbar"><button id="today">오늘</button><button id="add">＋ 업무</button><label><input id="top" type="checkbox" checked> 항상 위</label><button id="jpg">JPG</button><button id="pdf">PDF</button><button id="print">인쇄</button></header>
-<main id="days"></main><button id="older" class="older">이전 날짜 30일 더 보기</button><script src="date-utils.js"></script><script src="renderer.js"></script></body></html>
+
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>WONTECH 업무메모</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="toolbar">
+    <button id="today">오늘</button>
+    <button id="add">＋ 업무</button>
+    <button id="checklist">✓ 체크</button>
+    <label><input id="top" type="checkbox" checked> 항상 위</label>
+    <button id="jpg">JPG</button>
+    <button id="pdf">PDF</button>
+    <button id="print">인쇄</button>
+  </header>
+
+  <main id="days"></main>
+  <button id="older" class="older">이전 날짜 30일 더 보기</button>
+
+  <div id="checkModal" class="modal" aria-hidden="true">
+    <section class="check-window" role="dialog" aria-modal="true" aria-labelledby="checkTitle">
+      <header class="check-window-head">
+        <div>
+          <strong id="checkTitle">장기 체크리스트</strong>
+          <small>날짜와 관계없이 계속 보관되는 업무</small>
+        </div>
+        <button id="closeChecklist" class="close-button" aria-label="닫기">×</button>
+      </header>
+      <div class="check-columns"><div>등록일</div><div>업무 내용</div><div>진행상황</div></div>
+      <div id="checkItems" class="check-items"></div>
+    </section>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="date-utils.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>
