@@ -25,9 +25,22 @@ app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit()});
 ipcMain.handle('top',(_,v)=>{win.setAlwaysOnTop(v);return win.isAlwaysOnTop()});
 ipcMain.handle('quote-window',(_,open)=>{
   if(!win||win.isDestroyed())return false;
-  const size=open?QUOTE_SIZE:NORMAL_SIZE;
-  win.setSize(size.width,size.height,true);
-  win.center();
+
+  if(open){
+    // 견적관리에서는 가로 스크롤 없이 최대한 많은 칸을 보기 위해
+    // 프로그램 창을 사용 가능한 모니터 영역까지 자동 최대화합니다.
+    if(!win.isMaximized())win.maximize();
+    win.focus();
+    return true;
+  }
+
+  // 견적관리 닫기 → 일반 업무메모 크기로 복귀
+  if(win.isMaximized())win.unmaximize();
+  setTimeout(()=>{
+    if(!win||win.isDestroyed())return;
+    win.setSize(NORMAL_SIZE.width,NORMAL_SIZE.height,true);
+    win.center();
+  },120);
   return true;
 });
 
