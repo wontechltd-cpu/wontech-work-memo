@@ -100,8 +100,9 @@ button{cursor:pointer}
 /* 견적관리 */
 .quote-modal{padding:8px}
 .quote-window{
-  width:min(1500px,99vw);height:min(850px,97vh);background:#fff;border-radius:10px;
-  box-shadow:0 14px 45px #0008;overflow:hidden;display:flex;flex-direction:column
+  width:calc(100vw - 16px);height:calc(100vh - 16px);max-width:none;max-height:none;
+  background:#fff;border-radius:10px;box-shadow:0 14px 45px #0008;
+  overflow:hidden;display:flex;flex-direction:column
 }
 .quote-tabs{
   display:flex;gap:6px;align-items:center;padding:8px 10px;background:#f3f6f8;
@@ -118,22 +119,45 @@ button{cursor:pointer}
 .quote-count{margin-left:auto;font-weight:800;font-size:12px}
 
 .quote-list-view{display:flex;flex:1;min-height:0;flex-direction:column}
-.quote-table-wrap{flex:1;min-height:0;overflow:auto;background:#fff}
-.quote-table{min-width:1880px}
+.quote-table-wrap{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;background:#fff}
+.quote-table{width:100%;min-width:0}
 .quote-row{
   display:grid;
-  grid-template-columns:48px 300px 75px 75px 125px 135px 125px 135px 145px 125px 135px 120px 120px 95px 220px;
+  width:100%;
+  grid-template-columns:
+    34px
+    minmax(155px,2.25fr)
+    48px
+    48px
+    minmax(72px,.85fr)
+    minmax(78px,.9fr)
+    minmax(72px,.85fr)
+    minmax(78px,.9fr)
+    minmax(82px,1fr)
+    minmax(68px,.78fr)
+    minmax(82px,.95fr)
+    minmax(82px,.92fr)
+    minmax(82px,.92fr)
+    62px
+    minmax(105px,1.35fr);
   border-bottom:1px solid #ddd
 }
-.quote-row>div{min-height:43px;display:flex;align-items:center;padding:5px;border-right:1px solid #ddd}
+.quote-row>div{
+  min-width:0;min-height:42px;display:flex;align-items:center;
+  padding:4px 3px;border-right:1px solid #ddd;overflow:hidden
+}
 .quote-header{
   position:sticky;top:0;z-index:4;background:#f5f2e9;border-bottom:2px solid #253746;
   font-weight:900;text-align:center
 }
 .quote-header>div{justify-content:center;white-space:nowrap}
 .quote-row input,.quote-row select{
-  width:100%;border:1px solid #c5d0d7;border-radius:4px;padding:6px;background:#fff;font-size:12px
+  width:100%;min-width:0;border:1px solid #c5d0d7;border-radius:4px;
+  padding:5px 3px;background:#fff;font-size:10px
 }
+.quote-header{font-size:10px}
+.quote-row .quote-title{font-size:10.5px}
+.quote-row input[type="date"]{font-size:9px;padding-left:1px;padding-right:1px}
 .quote-row .q-center{text-align:center;text-align-last:center}
 .quote-row .q-money{text-align:right;font-variant-numeric:tabular-nums}
 .quote-row .q-calc{justify-content:flex-end;padding-right:10px;font-weight:800;font-variant-numeric:tabular-nums}
@@ -181,6 +205,35 @@ button{cursor:pointer}
 
 .print-check-head,.print-check-row{display:grid;grid-template-columns:12mm 28mm 1fr 25mm}
 .print-check-head{font-weight:800;background:#f3f3f3}
+
+
+@media(max-width:1500px){
+  .quote-tabs{gap:4px;padding:6px 8px}
+  .quote-tabs button{padding:6px 7px;font-size:10px}
+  .quote-count{font-size:10px}
+  .quote-row{
+    grid-template-columns:
+      30px
+      minmax(135px,2.15fr)
+      42px
+      42px
+      minmax(64px,.8fr)
+      minmax(68px,.85fr)
+      minmax(64px,.8fr)
+      minmax(68px,.85fr)
+      minmax(72px,.9fr)
+      minmax(58px,.7fr)
+      minmax(72px,.85fr)
+      minmax(72px,.82fr)
+      minmax(72px,.82fr)
+      56px
+      minmax(92px,1.2fr);
+  }
+  .quote-row>div{padding:3px 2px;min-height:40px}
+  .quote-row input,.quote-row select{font-size:9px;padding:4px 2px}
+  .quote-header{font-size:9px}
+  .quote-help{font-size:10px}
+}
 
 @media(max-width:620px){
   .top-label{margin-left:0}
