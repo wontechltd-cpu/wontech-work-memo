@@ -11,9 +11,11 @@
     <button id="today">오늘</button>
     <button id="add">＋ 업무</button>
     <button id="checklist">✓ 체크</button>
+    <button id="quotes">견적관리</button>
     <button id="changeLogo">마크 교체</button>
     <input id="logoFile" class="file-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
-    <label><input id="top" type="checkbox" checked> 항상 위</label>
+
+    <label class="top-label"><input id="top" type="checkbox" checked> 항상 위</label>
     <button id="jpg">JPG</button>
     <button id="pdf">PDF</button>
     <button id="print">인쇄</button>
@@ -22,6 +24,7 @@
   <main id="days"></main>
   <button id="older" class="older">이전 날짜 30일 더 보기</button>
 
+  <!-- 장기 체크리스트 -->
   <div id="checkModal" class="modal" aria-hidden="true">
     <section class="check-window" role="dialog" aria-modal="true" aria-labelledby="checkTitle">
       <header class="check-window-head">
@@ -42,6 +45,88 @@
         <div>진행상황</div>
       </div>
       <div id="checkItems" class="check-items"></div>
+    </section>
+  </div>
+
+  <!-- 견적관리 -->
+  <div id="quoteModal" class="modal quote-modal" aria-hidden="true">
+    <section class="quote-window" role="dialog" aria-modal="true" aria-labelledby="quoteTitle">
+      <header class="quote-window-head">
+        <div>
+          <strong id="quoteTitle">견적관리</strong>
+          <small>견적 · 입찰 · 거래처 담당자를 한 화면에서 관리합니다.</small>
+        </div>
+        <div class="quote-window-actions">
+          <button id="quoteJpg">JPG</button>
+          <button id="quotePdf">PDF</button>
+          <button id="quotePrint">인쇄</button>
+          <button id="closeQuotes" class="close-button" aria-label="닫기">×</button>
+        </div>
+      </header>
+
+      <nav class="quote-tabs" aria-label="견적관리 메뉴">
+        <button id="quoteActiveTab" class="active">진행 견적</button>
+        <button id="quoteYesTab" class="yes-tab">입찰 유 리스트</button>
+        <button id="quoteCxlTab" class="cxl-tab">CXL 리스트</button>
+        <button id="quoteContactTab" class="contact-tab">담당자 편집</button>
+        <span id="quoteCount" class="quote-count"></span>
+      </nav>
+
+      <section id="quoteListView" class="quote-list-view">
+        <div class="quote-table-wrap">
+          <div class="quote-table">
+            <div class="quote-row quote-header">
+              <div>NO</div>
+              <div>견적제목</div>
+              <div>단위</div>
+              <div>수량</div>
+              <div>견적단가</div>
+              <div>견적금액</div>
+              <div>입찰단가</div>
+              <div>입찰금액</div>
+              <div>요청회사</div>
+              <div>부서</div>
+              <div>담당자</div>
+              <div>제출일자</div>
+              <div>입찰일자</div>
+              <div>입찰유무</div>
+              <div>비고</div>
+            </div>
+            <div id="quoteRows"></div>
+          </div>
+        </div>
+
+        <div id="quoteAddBar" class="quote-add-bar">
+          <button id="addQuote">＋ 견적 추가</button>
+        </div>
+
+        <div class="quote-help">
+          <b>입찰유무</b>에서 <b>유</b>를 선택하면 진행 견적에서 빠지고 ‘입찰 유 리스트’로 이동합니다.
+          <b>CXL</b>을 선택하면 ‘CXL 리스트’로 이동합니다. 별도 리스트에서 <b>무</b>로 되돌리면 진행 견적으로 복귀합니다.
+          견적금액과 입찰금액은 각각 <b>단가 × 수량</b>으로 자동 계산됩니다.
+        </div>
+      </section>
+
+      <section id="contactView" class="contact-view">
+        <div class="contact-help">
+          <b>담당자 편집</b>에서 요청회사 / 부서 / 담당자를 한 번 저장해 두면 견적 입력 시 재사용할 수 있습니다.
+          견적의 담당자 칸에서 담당자만 선택해도 요청회사와 부서가 자동으로 채워집니다.
+        </div>
+
+        <div class="contact-add-form">
+          <input id="newContactCompany" placeholder="요청회사">
+          <input id="newContactDept" placeholder="부서">
+          <input id="newContactPerson" placeholder="담당자 (직급 포함 가능)">
+          <button id="addContact">＋ 담당자 저장</button>
+        </div>
+
+        <div class="contact-table">
+          <div class="contact-row contact-head">
+            <div>NO</div><div>요청회사</div><div>부서</div><div>담당자</div><div>저장</div><div>삭제</div>
+          </div>
+          <div id="contactRows"></div>
+        </div>
+      </section>
     </section>
   </div>
 
