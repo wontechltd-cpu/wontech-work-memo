@@ -6,6 +6,25 @@ const shift=shiftDate;
 const LOGO_KEY='wontech:companyLogo';
 const QUOTE_KEY='wontech:quotes:v1';
 const CONTACT_KEY='wontech:quoteContacts:v1';
+const QUOTE_PRINT_WIDTH_KEY='wontech:quotePrintWidths:v1';
+const QUOTE_PRINT_MAX_MM=281;
+const QUOTE_PRINT_COLUMNS=[
+  {key:'no',label:'NO',def:7,min:5,max:15},
+  {key:'title',label:'견적제목',def:48,min:25,max:90},
+  {key:'unit',label:'단위',def:10,min:7,max:20},
+  {key:'qty',label:'수량',def:10,min:7,max:20},
+  {key:'quoteUnit',label:'견적단가',def:18,min:12,max:32},
+  {key:'quoteAmount',label:'견적금액',def:20,min:13,max:35},
+  {key:'bidUnit',label:'입찰단가',def:18,min:12,max:32},
+  {key:'bidAmount',label:'입찰금액',def:20,min:13,max:35},
+  {key:'company',label:'요청회사',def:21,min:12,max:45},
+  {key:'dept',label:'부서',def:15,min:10,max:35},
+  {key:'person',label:'담당자',def:15,min:10,max:35},
+  {key:'submitDate',label:'제출일자',def:19,min:15,max:28},
+  {key:'bidDate',label:'입찰일자',def:19,min:15,max:28},
+  {key:'bidStatus',label:'입찰유무',def:13,min:9,max:22},
+  {key:'note',label:'비고',def:28,min:12,max:60}
+];
 let quoteView='active';
 
 const UNIT_OPTIONS=['EA','SET','LOT','식','KG','M','본','SHEET','ROL','NA'];
@@ -637,21 +656,137 @@ function printableChecklistHtml(){
       ${rows||'<div class="check-empty">체크로 지정된 업무가 없습니다.</div>'}
     </section>`;
 }
+
+function defaultQuotePrintWidths(){
+  return Object.fromEntries(QUOTE_PRINT_COLUMNS.map(c=>[c.key,c.def]));
+}
+function getQuotePrintWidths(){
+  let saved={};
+  try{saved=JSON.parse(localStorage.getItem(QUOTE_PRINT_WIDTH_KEY)||'{}')||{}}
+  catch{saved={}}
+  const result={};
+  QUOTE_PRINT_COLUMNS.forEach(c=>{
+    const raw=Number(saved[c.key]);
+    result[c.key]=Number.isFinite(raw)
+      ?Math.min(c.max,Math.max(c.min,Math.round(raw*10)/10))
+      :c.def;
+  });
+  return result;
+}
+function quotePrintWidthTotal(widths=getQuotePrintWidths()){
+  return QUOTE_PRINT_COLUMNS.reduce((sum,c)=>sum+Number(widths[c.key]||0),0);
+}
+function quotePrintGridCss(widths=getQuotePrintWidths()){
+  return QUOTE_PRINT_COLUMNS.map(c=>`${Number(widths[c.key]||c.def)}mm`).join(' ');
+}
+function openQuotePrintSettings(){
+  renderQuotePrintSettings();
+  $('#quotePrintSettingsModal').classList.add('open');
+  $('#quotePrintSettingsModal').setAttribute('aria-hidden','false');
+}
+function closeQuotePrintSettings(){
+  $('#quotePrintSettingsModal').classList.remove('open');
+  $('#quotePrintSettingsModal').setAttribute('aria-hidden','true');
+}
+function quotePrintSettingsOpen(){
+  return $('#quotePrintSettingsModal').classList.contains('open');
+}
+function renderQuotePrintSettings(){
+  const widths=getQuotePrintWidths();
+  $('#quoteWidthRows').innerHTML=QUOTE_PRINT_COLUMNS.map(c=>`
+    <div class="quote-width-item">
+      <label for="quoteWidth_${c.key}">${esc(c.label)}</label>
+      <div class="quote-width-input-wrap">
+        <input
+          id="quoteWidth_${c.key}"
+          class="quote-width-input"
+          type="number"
+          min="${c.min}"
+          max="${c.max}"
+          step="1"
+          value="${widths[c.key]}"
+          data-width-key="${c.key}">
+        <span class="quote-width-unit">mm</span>
+      </div>
+    </div>`).join('');
+  document.querySelectorAll('[data-width-key]').forEach(input=>{
+    input.addEventListener('input',updateQuotePrintWidthSummary);
+  });
+  updateQuotePrintWidthSummary();
+}
+function readQuotePrintWidthForm(){
+  const values={};
+  QUOTE_PRINT_COLUMNS.forEach(c=>{
+    const input=document.querySelector(`[data-width-key="${c.key}"]`);
+    let value=Number(input?.value);
+    if(!Number.isFinite(value))value=c.def;
+    value=Math.min(c.max,Math.max(c.min,value));
+    values[c.key]=Math.round(value*10)/10;
+  });
+  return values;
+}
+function writeQuotePrintWidthForm(widths){
+  QUOTE_PRINT_COLUMNS.forEach(c=>{
+    const input=document.querySelector(`[data-width-key="${c.key}"]`);
+    if(input)input.value=Math.round(Number(widths[c.key]||c.def)*10)/10;
+  });
+  updateQuotePrintWidthSummary();
+}
+function updateQuotePrintWidthSummary(){
+  const total=quotePrintWidthTotal(readQuotePrintWidthForm());
+  const label=$('#quoteWidthTotal');
+  label.textContent=`${Math.round(total*10)/10} mm`;
+  label.classList.toggle('over',total>QUOTE_PRINT_MAX_MM+0.01);
+}
+function fitQuotePrintWidthsToA4(){
+  const widths=readQuotePrintWidthForm();
+  const total=quotePrintWidthTotal(widths);
+  if(total<=0)return;
+  const scale=QUOTE_PRINT_MAX_MM/total;
+  const fitted={};
+  QUOTE_PRINT_COLUMNS.forEach(c=>{
+    fitted[c.key]=Math.min(c.max,Math.max(c.min,Math.round(widths[c.key]*scale*10)/10));
+  });
+
+  // 반올림/최소폭 때문에 생기는 오차를 가장 넓은 '견적제목' 칸에서 정리
+  let diff=Math.round((QUOTE_PRINT_MAX_MM-quotePrintWidthTotal(fitted))*10)/10;
+  if(Math.abs(diff)>=0.1){
+    const titleCol=QUOTE_PRINT_COLUMNS.find(c=>c.key==='title');
+    fitted.title=Math.min(titleCol.max,Math.max(titleCol.min,Math.round((fitted.title+diff)*10)/10));
+  }
+  writeQuotePrintWidthForm(fitted);
+}
+function saveQuotePrintWidthSettings(){
+  const widths=readQuotePrintWidthForm();
+  const total=quotePrintWidthTotal(widths);
+  if(total>QUOTE_PRINT_MAX_MM+0.01){
+    showToast(`현재 폭이 ${Math.round(total*10)/10}mm입니다. 281mm 이하로 줄여 주세요.`);
+    return;
+  }
+  localStorage.setItem(QUOTE_PRINT_WIDTH_KEY,JSON.stringify(widths));
+  closeQuotePrintSettings();
+  showToast('A4 가로 출력 칸 너비를 저장했습니다.');
+}
+
 function printableQuotesHtml(){
   const list=currentQuotes();
+  const widths=getQuotePrintWidths();
+  const gridCss=quotePrintGridCss(widths);
+  const total=Math.round(quotePrintWidthTotal(widths)*10)/10;
+
   const rows=list.map((q,i)=>{
     const quoteAmount=numberValue(q.qty)*numberValue(q.quoteUnit);
     const bidAmount=numberValue(q.qty)*numberValue(q.bidUnit);
     const cls=q.bidStatus==='유'?'quote-print-yes':q.bidStatus==='CXL'?'quote-print-cxl':'';
     return `
-      <div class="quote-print-row ${cls}">
+      <div class="quote-print-row ${cls}" style="--quote-grid:${gridCss}">
         <div>${i+1}</div><div class="quote-print-title">${esc(q.title)}</div>
         <div>${esc(q.unit)}</div><div>${esc(q.qty)}</div>
         <div class="money">${money(q.quoteUnit)}</div><div class="money">${money(quoteAmount)}</div>
         <div class="money">${money(q.bidUnit)}</div><div class="money">${money(bidAmount)}</div>
         <div>${esc(q.company)}</div><div>${esc(q.dept)}</div><div>${esc(q.person)}</div>
         <div>${esc(q.submitDate)}</div><div>${esc(q.bidDate)}</div><div>${esc(q.bidStatus||'무')}</div>
-        <div>${esc(q.note)}</div><div>${q.attachment?.storedName?'있음':'-'}</div>
+        <div>${esc(q.note)}</div>
       </div>`;
   }).join('');
 
@@ -664,16 +799,18 @@ function printableQuotesHtml(){
           <small>${new Date().toLocaleDateString('ko-KR')} 출력</small>
         </div>
       </div>
-      <div class="quote-print-table">
-        <div class="quote-print-row quote-print-head">
+      <div class="quote-print-table" style="width:${total}mm">
+        <div class="quote-print-row quote-print-head" style="--quote-grid:${gridCss}">
           <div>NO</div><div>견적제목</div><div>단위</div><div>수량</div>
           <div>견적단가</div><div>견적금액</div><div>입찰단가</div><div>입찰금액</div>
           <div>요청회사</div><div>부서</div><div>담당자</div>
-          <div>제출일자</div><div>입찰일자</div><div>입찰유무</div><div>비고</div><div>첨부</div>
+          <div>제출일자</div><div>입찰일자</div><div>입찰유무</div><div>비고</div>
         </div>
         ${rows||'<div class="quote-print-empty">등록된 견적이 없습니다.</div>'}
       </div>
-      <div class="quote-print-footer">금액 단위: 원(₩) / A4 가로</div>
+      <div class="quote-print-footer">
+        금액 단위: 원(₩) / A4 가로 / 첨부파일 정보는 출력에서 제외
+      </div>
     </section>`;
 }
 async function exportQuotesExcel(){
@@ -766,6 +903,14 @@ $('#quoteContactTab').onclick=()=>{quoteView='contacts';renderQuoteManager()};
 $('#addQuote').onclick=addQuote;
 $('#addContact').onclick=addContact;
 $('#quoteExcel').onclick=exportQuotesExcel;
+$('#quotePrintSettings').onclick=openQuotePrintSettings;
+$('#closeQuotePrintSettings').onclick=closeQuotePrintSettings;
+$('#quotePrintSettingsModal').onclick=e=>{
+  if(e.target===$('#quotePrintSettingsModal'))closeQuotePrintSettings();
+};
+$('#quoteWidthFit').onclick=fitQuotePrintWidthsToA4;
+$('#quoteWidthReset').onclick=()=>writeQuotePrintWidthForm(defaultQuotePrintWidths());
+$('#quoteWidthSave').onclick=saveQuotePrintWidthSettings;
 $('#quoteJpg').onclick=()=>outputQuotes(window.desk.jpg);
 $('#quotePdf').onclick=()=>outputQuotes(window.desk.pdf);
 $('#quotePrint').onclick=()=>outputQuotes(window.desk.print);
@@ -774,7 +919,8 @@ $('#quoteModal').onclick=e=>{if(e.target===$('#quoteModal'))closeQuotes()};
 
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){
-    if(isQuotesOpen())closeQuotes();
+    if(quotePrintSettingsOpen())closeQuotePrintSettings();
+    else if(isQuotesOpen())closeQuotes();
     else if(isChecklistOpen())closeChecklist();
   }
 });
