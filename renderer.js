@@ -1,4 +1,5 @@
 const $=s=>document.querySelector(s), days=$('#days');
+const IS_QUOTE_WINDOW=new URLSearchParams(location.search).get('view')==='quotes';
 const {workDate,shiftDate,dateRangeExclusive}=window.WorkDate;
 let visible=30, active, renderedWorkDate=workDate();
 const shift=shiftDate;
@@ -607,21 +608,44 @@ function addContact(){
   showToast(`${person} 담당자를 저장했습니다.`);
   renderQuoteManager();
 }
-async function openQuotes(){
-  closeChecklist();
+function showQuoteWindowContent(){
   quoteView='active';
   $('#quoteModal').classList.add('open');
   $('#quoteModal').setAttribute('aria-hidden','false');
-  try{await window.desk.quoteWindow(true)}catch{}
   renderQuoteManager();
 }
+
+async function openQuotes(){
+  // 일반 업무메모 창에서는 화면 크기를 바꾸지 않고 별도 견적관리 창만 엽니다.
+  if(!IS_QUOTE_WINDOW){
+    closeChecklist();
+    try{
+      const result=await window.desk.quoteWindow(true);
+      if(result===false)showToast('견적관리 창을 열지 못했습니다.');
+    }catch(error){
+      console.error(error);
+      showToast('견적관리 창을 열지 못했습니다.');
+    }
+    return;
+  }
+
+  // 견적관리 전용 창 안에서는 견적관리 화면만 표시합니다.
+  showQuoteWindowContent();
+}
+
 async function closeQuotes(){
-  if(!$('#quoteModal').classList.contains('open'))return;
+  if(IS_QUOTE_WINDOW){
+    try{await window.desk.quoteWindow(false)}
+    catch{window.close()}
+    return;
+  }
+
+  // 이전 버전의 모달 상태가 남아 있더라도 일반 업무메모 창만 정리하고,
+  // 별도 견적관리 창은 닫지 않습니다.
   $('#quoteModal').classList.remove('open');
   $('#quoteModal').setAttribute('aria-hidden','true');
-  try{await window.desk.quoteWindow(false)}catch{}
 }
-function isQuotesOpen(){return $('#quoteModal').classList.contains('open')}
+function isQuotesOpen(){return IS_QUOTE_WINDOW&&$('#quoteModal').classList.contains('open')}
 
 function printableDayHtml(k=active||workDate()){
   const sheet=document.querySelector(`[data-date="${k}"]`);
@@ -878,10 +902,28 @@ function refreshAtDateBoundary(){
   }
 }
 
-rolloverThrough();render();applyCurrentLogo();go(workDate());
-setInterval(refreshAtDateBoundary,30000);
-window.addEventListener('focus',refreshAtDateBoundary);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshAtDateBoundary()});
+if(IS_QUOTE_WINDOW){
+  document.body.classList.add('quote-only-window');
+  document.title='WONTECH 견적관리';
+  applyCurrentLogo();
+  showQuoteWindowContent();
+}else{
+  rolloverThrough();
+  render();
+  applyCurrentLogo();
+  go(workDate());
+  setInterval(refreshAtDateBoundary,30000);
+  window.addEventListener('focus',refreshAtDateBoundary);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshAtDateBoundary()});
+}
+
+// 다른 창에서 회사마크/견적 데이터가 바뀌면 열린 창도 바로 갱신합니다.
+window.addEventListener('storage',e=>{
+  if(e.key===LOGO_KEY)applyCurrentLogo();
+  if(IS_QUOTE_WINDOW&&[QUOTE_KEY,CONTACT_KEY,QUOTE_PRINT_WIDTH_KEY].includes(e.key)){
+    renderQuoteManager();
+  }
+});
 
 $('#today').onclick=()=>{closeChecklist();closeQuotes();go(workDate())};
 $('#add').onclick=()=>{closeChecklist();closeQuotes();addTask(workDate())};
