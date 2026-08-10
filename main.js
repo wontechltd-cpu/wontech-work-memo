@@ -1,4 +1,4 @@
-const {app,BrowserWindow,ipcMain,dialog}=require('electron');
+const {app,BrowserWindow,ipcMain,dialog,shell}=require('electron');
 const path=require('path');
 const fs=require('fs');
 
@@ -43,6 +43,124 @@ ipcMain.handle('quote-window',(_,open)=>{
   },120);
   return true;
 });
+
+function quoteAttachmentDir(){
+  const dir=path.join(app.getPath('userData'),'quote-attachments');
+  fs.mkdirSync(dir,{recursive:true});
+  return dir;
+}
+function quoteAttachmentPath(storedName=''){
+  const safe=path.basename(String(storedName||''));
+  return safe?path.join(quoteAttachmentDir(),safe):'';
+}
+function excelAttachmentExtOk(filePath=''){
+  return ['.xlsx','.xls','.xlsm'].includes(path.extname(filePath).toLowerCase());
+}
+
+// ----- 최소 XLSX 작성기: 추가 npm 패키지 없이 Excel(.xlsx) 파일 생성 -----
+const CRC_TABLE=(()=>{
+  const table=new Uint32Array(256);
+  for(let n=0;n<256;n++){
+    let c=n;
+    for(let k=0;k<8;k++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);
+    table[n]=c>>>0;
+  }
+  return table;
+})();
+function crc32(buffer){
+  let c=0xFFFFFFFF;
+  for(const b of buffer)c=CRC_TABLE[(c^b)&0xFF]^(c>>>8);
+  return (c^0xFFFFFFFF)>>>0;
+}
+function dosDateTime(date=new Date()){
+  const year=Math.max(1980,date.getFullYear());
+  const time=(date.getHours()<<11)|(date.getMinutes()<<5)|Math.floor(date.getSeconds()/2);
+  const day=((year-1980)<<9)|((date.getMonth()+1)<<5)|date.getDate();
+  return {time,date:day};
+}
+function createZip(entries){
+  const locals=[],centrals=[];
+  let offset=0;
+  const dt=dosDateTime();
+  for(const entry of entries){
+    const name=Buffer.from(entry.name,'utf8');
+    const data=Buffer.isBuffer(entry.data)?entry.data:Buffer.from(entry.data,'utf8');
+    const crc=crc32(data);
+    const local=Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50,0);local.writeUInt16LE(20,4);local.writeUInt16LE(0x0800,6);
+    local.writeUInt16LE(0,8);local.writeUInt16LE(dt.time,10);local.writeUInt16LE(dt.date,12);
+    local.writeUInt32LE(crc,14);local.writeUInt32LE(data.length,18);local.writeUInt32LE(data.length,22);
+    local.writeUInt16LE(name.length,26);local.writeUInt16LE(0,28);
+    locals.push(local,name,data);
+
+    const central=Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50,0);central.writeUInt16LE(20,4);central.writeUInt16LE(20,6);
+    central.writeUInt16LE(0x0800,8);central.writeUInt16LE(0,10);central.writeUInt16LE(dt.time,12);central.writeUInt16LE(dt.date,14);
+    central.writeUInt32LE(crc,16);central.writeUInt32LE(data.length,20);central.writeUInt32LE(data.length,24);
+    central.writeUInt16LE(name.length,28);central.writeUInt16LE(0,30);central.writeUInt16LE(0,32);
+    central.writeUInt16LE(0,34);central.writeUInt16LE(0,36);central.writeUInt32LE(0,38);central.writeUInt32LE(offset,42);
+    centrals.push(central,name);
+    offset+=local.length+name.length+data.length;
+  }
+  const centralSize=centrals.reduce((n,b)=>n+b.length,0);
+  const end=Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50,0);end.writeUInt16LE(0,4);end.writeUInt16LE(0,6);
+  end.writeUInt16LE(entries.length,8);end.writeUInt16LE(entries.length,10);
+  end.writeUInt32LE(centralSize,12);end.writeUInt32LE(offset,16);end.writeUInt16LE(0,20);
+  return Buffer.concat([...locals,...centrals,end]);
+}
+function xmlEscape(value=''){
+  return String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&apos;');
+}
+function excelColumnName(index){
+  let n=index+1,out='';
+  while(n){const r=(n-1)%26;out=String.fromCharCode(65+r)+out;n=Math.floor((n-1)/26)}
+  return out;
+}
+function quoteExcelBuffer(rows=[]){
+  const columns=[
+    ['NO','no',6,'number'],['견적제목','title',38,'text'],['단위','unit',9,'text'],['수량','qty',9,'number'],
+    ['견적단가','quoteUnit',15,'money'],['견적금액','quoteAmount',16,'money'],['입찰단가','bidUnit',15,'money'],['입찰금액','bidAmount',16,'money'],
+    ['요청회사','company',18,'text'],['부서','dept',14,'text'],['담당자','person',17,'text'],['제출일자','submitDate',13,'text'],
+    ['입찰일자','bidDate',13,'text'],['입찰유무','bidStatus',10,'text'],['비고','note',26,'text'],['첨부견적서','attachment',38,'text']
+  ];
+  const cell=(r,c,value,type,header=false)=>{
+    const ref=excelColumnName(c)+(r+1);
+    const style=header?1:(type==='money'?2:(type==='number'?3:4));
+    if(type==='money'||type==='number'){
+      const n=Number(value)||0;
+      return `<c r="${ref}" s="${style}"><v>${n}</v></c>`;
+    }
+    return `<c r="${ref}" s="${style}" t="inlineStr"><is><t xml:space="preserve">${xmlEscape(value??'')}</t></is></c>`;
+  };
+  const header='<row r="1" ht="24" customHeight="1">'+columns.map((col,c)=>cell(0,c,col[0],'text',true)).join('')+'</row>';
+  const dataRows=rows.map((row,i)=>{
+    const rn=i+2;
+    return `<row r="${rn}" ht="21" customHeight="1">`+columns.map((col,c)=>cell(i+1,c,row[col[1]],col[3],false)).join('')+'</row>';
+  }).join('');
+  const cols=columns.map((col,i)=>`<col min="${i+1}" max="${i+1}" width="${col[2]}" customWidth="1"/>`).join('');
+  const lastRow=Math.max(1,rows.length+1);
+  const sheet=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>
+<cols>${cols}</cols><sheetData>${header}${dataRows}</sheetData><autoFilter ref="A1:P${lastRow}"/>
+<pageMargins left="0.25" right="0.25" top="0.4" bottom="0.4" header="0.2" footer="0.2"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+  const styles=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Malgun Gothic"/></font><font><b/><sz val="11"/><name val="Malgun Gothic"/></font></fonts>
+<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf></cellXfs>
+<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+  const entries=[
+    {name:'[Content_Types].xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`},
+    {name:'_rels/.rels',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`},
+    {name:'xl/workbook.xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="견적관리" sheetId="1" r:id="rId1"/></sheets></workbook>`},
+    {name:'xl/_rels/workbook.xml.rels',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`},
+    {name:'xl/styles.xml',data:styles},{name:'xl/worksheets/sheet1.xml',data:sheet}
+  ];
+  return createZip(entries);
+}
 
 function logoDataUrl(){
   const logoPath=path.join(__dirname,'assets','wontech-logo.jpg');
@@ -119,7 +237,7 @@ function printableDocument(content,{preview=false,title='WONTECH 출력 미리�
       .quote-print-table{border:.25mm solid #444;font-size:6.6pt}
       .quote-print-row{
         display:grid;
-        grid-template-columns:7mm 48mm 10mm 10mm 18mm 20mm 18mm 20mm 21mm 15mm 15mm 19mm 19mm 13mm 28mm;
+        grid-template-columns:7mm 43mm 10mm 10mm 18mm 20mm 18mm 20mm 20mm 15mm 15mm 19mm 19mm 13mm 22mm 12mm;
         border-bottom:.2mm solid #999
       }
       .quote-print-row:last-child{border-bottom:0}
@@ -184,6 +302,53 @@ async function openPrintPreview(name,html,options={}){
   if(!preview.isVisible()){preview.center();preview.show()}
   return {success:true,preview:true};
 }
+
+ipcMain.handle('quote-attach-file',async(_,quoteId,oldStoredName='')=>{
+  const r=await dialog.showOpenDialog(win,{
+    title:'본 견적서 Excel 파일 선택',properties:['openFile'],
+    filters:[{name:'Excel 견적서',extensions:['xlsx','xls','xlsm']}]
+  });
+  if(r.canceled||!r.filePaths?.[0])return {canceled:true};
+  const source=r.filePaths[0];
+  if(!excelAttachmentExtOk(source))return {success:false,reason:'Excel 파일(.xlsx/.xls/.xlsm)만 첨부할 수 있습니다.'};
+  const stat=fs.statSync(source);
+  if(stat.size>100*1024*1024)return {success:false,reason:'첨부파일은 100MB 이하만 사용할 수 있습니다.'};
+  const ext=path.extname(source).toLowerCase();
+  const storedName=`${Date.now()}_${Math.random().toString(36).slice(2,10)}${ext}`;
+  const dest=quoteAttachmentPath(storedName);
+  fs.copyFileSync(source,dest);
+  if(oldStoredName){
+    const oldPath=quoteAttachmentPath(oldStoredName);
+    try{if(oldPath&&oldPath!==dest&&fs.existsSync(oldPath))fs.unlinkSync(oldPath)}catch{}
+  }
+  return {success:true,originalName:path.basename(source),storedName,size:stat.size};
+});
+
+ipcMain.handle('quote-open-file',async(_,storedName)=>{
+  const filePath=quoteAttachmentPath(storedName);
+  if(!filePath||!fs.existsSync(filePath))return {success:false,reason:'첨부 견적서 파일을 찾을 수 없습니다.'};
+  const error=await shell.openPath(filePath);
+  return error?{success:false,reason:error}:{success:true};
+});
+
+ipcMain.handle('quote-remove-file',async(_,storedName)=>{
+  const filePath=quoteAttachmentPath(storedName);
+  try{
+    if(filePath&&fs.existsSync(filePath))fs.unlinkSync(filePath);
+    return {success:true};
+  }catch(error){return {success:false,reason:error.message}}
+});
+
+ipcMain.handle('quote-export-excel',async(_,name,rows=[])=>{
+  const r=await dialog.showSaveDialog(win,{
+    defaultPath:name+'.xlsx',filters:[{name:'Excel 통합문서',extensions:['xlsx']}]
+  });
+  if(r.canceled)return {canceled:true};
+  try{
+    fs.writeFileSync(r.filePath,quoteExcelBuffer(Array.isArray(rows)?rows:[]));
+    return {success:true,filePath:r.filePath};
+  }catch(error){return {success:false,reason:error.message}}
+});
 
 ipcMain.handle('jpg',async(_,name,html,options={})=>{
   const r=await dialog.showSaveDialog(win,{defaultPath:name+'.jpg',filters:[{name:'JPG 이미지',extensions:['jpg']}]});
