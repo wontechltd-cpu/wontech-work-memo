@@ -1,8 +1,12 @@
-const {contextBridge,ipcRenderer}=require('electron');
+const {contextBridge,ipcRenderer,webUtils}=require('electron');
 contextBridge.exposeInMainWorld('desk',{
   top:v=>ipcRenderer.invoke('top',v),
   quoteWindow:open=>ipcRenderer.invoke('quote-window',open),
   attachQuoteFile:(quoteId,oldStoredName)=>ipcRenderer.invoke('quote-attach-file',quoteId,oldStoredName),
+  attachDroppedQuoteFile:(file,quoteId,oldStoredName)=>{
+    const filePath=webUtils.getPathForFile(file);
+    return ipcRenderer.invoke('quote-attach-dropped-file',quoteId,oldStoredName,filePath);
+  },
   openQuoteFile:storedName=>ipcRenderer.invoke('quote-open-file',storedName),
   removeQuoteFile:storedName=>ipcRenderer.invoke('quote-remove-file',storedName),
   exportQuotesExcel:(name,rows)=>ipcRenderer.invoke('quote-export-excel',name,rows),
