@@ -78,8 +78,8 @@ function quoteAttachmentRecordPath(quoteId,originalName){
 function relativeQuoteAttachmentPath(filePath){
   return path.relative(quoteAttachmentDir(),filePath).replaceAll('\\','/');
 }
-function excelAttachmentExtOk(filePath=''){
-  return ['.xlsx','.xls','.xlsm'].includes(path.extname(filePath).toLowerCase());
+function quoteAttachmentExtOk(filePath=''){
+  return ['.xlsx','.xls','.xlsm','.jpg','.jpeg','.pdf'].includes(path.extname(filePath).toLowerCase());
 }
 
 // ----- 최소 XLSX 작성기: 추가 npm 패키지 없이 Excel(.xlsx) 파일 생성 -----
@@ -335,8 +335,8 @@ function storeQuoteAttachmentFromPath(source,quoteId,oldStoredName=''){
     }
     const stat=fs.statSync(source);
     if(!stat.isFile())return {success:false,reason:'파일만 첨부할 수 있습니다.'};
-    if(!excelAttachmentExtOk(source)){
-      return {success:false,reason:'Excel 파일(.xlsx/.xls/.xlsm)만 첨부할 수 있습니다.'};
+    if(!quoteAttachmentExtOk(source)){
+      return {success:false,reason:'Excel(.xlsx/.xls/.xlsm), JPG(.jpg/.jpeg), PDF(.pdf) 파일만 첨부할 수 있습니다.'};
     }
     if(stat.size>100*1024*1024){
       return {success:false,reason:'첨부파일은 100MB 이하만 사용할 수 있습니다.'};
@@ -379,8 +379,13 @@ function storeQuoteAttachmentFromPath(source,quoteId,oldStoredName=''){
 
 ipcMain.handle('quote-attach-file',async(_,quoteId,oldStoredName='')=>{
   const r=await dialog.showOpenDialog(win,{
-    title:'본 견적서 Excel 파일 선택',properties:['openFile'],
-    filters:[{name:'Excel 견적서',extensions:['xlsx','xls','xlsm']}]
+    title:'견적 첨부파일 선택',properties:['openFile'],
+    filters:[
+      {name:'견적 첨부파일',extensions:['xlsx','xls','xlsm','jpg','jpeg','pdf']},
+      {name:'Excel 파일',extensions:['xlsx','xls','xlsm']},
+      {name:'JPG 이미지',extensions:['jpg','jpeg']},
+      {name:'PDF 문서',extensions:['pdf']}
+    ]
   });
   if(r.canceled||!r.filePaths?.[0])return {canceled:true};
   return storeQuoteAttachmentFromPath(r.filePaths[0],quoteId,oldStoredName);
