@@ -49,9 +49,34 @@ function quoteAttachmentDir(){
   fs.mkdirSync(dir,{recursive:true});
   return dir;
 }
+function safeQuoteId(value=''){
+  return String(value||'quote').replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,100)||'quote';
+}
+function safeAttachmentFileName(name=''){
+  const original=path.basename(String(name||'견적서.xlsx'));
+  const ext=path.extname(original);
+  const base=path.basename(original,ext)
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g,'_')
+    .replace(/[. ]+$/g,'')
+    .trim()||'견적서';
+  const safeExt=['.xlsx','.xls','.xlsm'].includes(ext.toLowerCase())?ext:'.xlsx';
+  return (base+safeExt).slice(0,180);
+}
 function quoteAttachmentPath(storedName=''){
-  const safe=path.basename(String(storedName||''));
-  return safe?path.join(quoteAttachmentDir(),safe):'';
+  const raw=String(storedName||'').replaceAll('\\','/');
+  if(!raw)return '';
+  const root=path.resolve(quoteAttachmentDir());
+  const target=path.resolve(root,raw);
+  if(target!==root&&!target.startsWith(root+path.sep))return '';
+  return target;
+}
+function quoteAttachmentRecordPath(quoteId,originalName){
+  const folder=path.join(quoteAttachmentDir(),safeQuoteId(quoteId));
+  fs.mkdirSync(folder,{recursive:true});
+  return path.join(folder,safeAttachmentFileName(originalName));
+}
+function relativeQuoteAttachmentPath(filePath){
+  return path.relative(quoteAttachmentDir(),filePath).replaceAll('\\','/');
 }
 function excelAttachmentExtOk(filePath=''){
   return ['.xlsx','.xls','.xlsm'].includes(path.extname(filePath).toLowerCase());
@@ -303,7 +328,7 @@ async function openPrintPreview(name,html,options={}){
   return {success:true,preview:true};
 }
 
-function storeQuoteAttachmentFromPath(source,oldStoredName=''){
+function storeQuoteAttachmentFromPath(source,quoteId,oldStoredName=''){
   try{
     if(!source||!path.isAbsolute(source)||!fs.existsSync(source)){
       return {success:false,reason:'선택한 파일을 찾을 수 없습니다.'};
@@ -317,22 +342,34 @@ function storeQuoteAttachmentFromPath(source,oldStoredName=''){
       return {success:false,reason:'첨부파일은 100MB 이하만 사용할 수 있습니다.'};
     }
 
-    const ext=path.extname(source).toLowerCase();
-    const storedName=`${Date.now()}_${Math.random().toString(36).slice(2,10)}${ext}`;
-    const dest=quoteAttachmentPath(storedName);
-    fs.copyFileSync(source,dest);
+    const originalName=path.basename(source);
+    // 견적별 폴더 안에 "원래 파일명 그대로" 보관합니다.
+    const dest=quoteAttachmentRecordPath(quoteId,originalName);
+    const sourceResolved=path.resolve(source);
+    const destResolved=path.resolve(dest);
+
+    if(sourceResolved!==destResolved){
+      fs.copyFileSync(source,dest);
+    }
 
     if(oldStoredName){
       const oldPath=quoteAttachmentPath(oldStoredName);
       try{
-        if(oldPath&&oldPath!==dest&&fs.existsSync(oldPath))fs.unlinkSync(oldPath);
+        if(oldPath&&path.resolve(oldPath)!==destResolved&&fs.existsSync(oldPath)){
+          fs.unlinkSync(oldPath);
+          // 이전 랜덤파일이 있던 빈 하위폴더가 있다면 정리
+          const parent=path.dirname(oldPath);
+          if(parent!==quoteAttachmentDir()){
+            try{if(fs.existsSync(parent)&&fs.readdirSync(parent).length===0)fs.rmdirSync(parent)}catch{}
+          }
+        }
       }catch{}
     }
 
     return {
       success:true,
-      originalName:path.basename(source),
-      storedName,
+      originalName,
+      storedName:relativeQuoteAttachmentPath(dest),
       size:stat.size
     };
   }catch(error){
@@ -346,24 +383,69 @@ ipcMain.handle('quote-attach-file',async(_,quoteId,oldStoredName='')=>{
     filters:[{name:'Excel 견적서',extensions:['xlsx','xls','xlsm']}]
   });
   if(r.canceled||!r.filePaths?.[0])return {canceled:true};
-  return storeQuoteAttachmentFromPath(r.filePaths[0],oldStoredName);
+  return storeQuoteAttachmentFromPath(r.filePaths[0],quoteId,oldStoredName);
 });
 
 ipcMain.handle('quote-attach-dropped-file',async(_,quoteId,oldStoredName='',source='')=>{
-  return storeQuoteAttachmentFromPath(source,oldStoredName);
+  return storeQuoteAttachmentFromPath(source,quoteId,oldStoredName);
 });
 
-ipcMain.handle('quote-open-file',async(_,storedName)=>{
-  const filePath=quoteAttachmentPath(storedName);
-  if(!filePath||!fs.existsSync(filePath))return {success:false,reason:'첨부 견적서 파일을 찾을 수 없습니다.'};
-  const error=await shell.openPath(filePath);
-  return error?{success:false,reason:error}:{success:true};
+ipcMain.handle('quote-open-file',async(_,quoteId,attachment={})=>{
+  try{
+    const storedName=attachment?.storedName||'';
+    const originalName=attachment?.originalName||'';
+    let filePath=quoteAttachmentPath(storedName);
+
+    if(!filePath||!fs.existsSync(filePath)){
+      return {success:false,reason:'첨부 견적서 파일을 찾을 수 없습니다.'};
+    }
+
+    let migrated=false;
+    let migratedStoredName=storedName;
+
+    // v6/v7에서 랜덤 내부명으로 저장된 기존 파일은 처음 열 때
+    // 견적별 폴더 + 원래 파일명으로 자동 이전합니다.
+    const desiredPath=quoteAttachmentRecordPath(
+      quoteId,
+      originalName||path.basename(filePath)
+    );
+
+    if(path.resolve(filePath)!==path.resolve(desiredPath)){
+      fs.copyFileSync(filePath,desiredPath);
+      try{fs.unlinkSync(filePath)}catch{}
+      const oldParent=path.dirname(filePath);
+      if(oldParent!==quoteAttachmentDir()){
+        try{if(fs.existsSync(oldParent)&&fs.readdirSync(oldParent).length===0)fs.rmdirSync(oldParent)}catch{}
+      }
+      filePath=desiredPath;
+      migrated=true;
+      migratedStoredName=relativeQuoteAttachmentPath(desiredPath);
+    }
+
+    const error=await shell.openPath(filePath);
+    if(error)return {success:false,reason:error};
+
+    return {
+      success:true,
+      migrated,
+      storedName:migratedStoredName,
+      originalName:originalName||path.basename(filePath)
+    };
+  }catch(error){
+    return {success:false,reason:error.message};
+  }
 });
 
 ipcMain.handle('quote-remove-file',async(_,storedName)=>{
   const filePath=quoteAttachmentPath(storedName);
   try{
     if(filePath&&fs.existsSync(filePath))fs.unlinkSync(filePath);
+    if(filePath){
+      const parent=path.dirname(filePath);
+      if(parent!==quoteAttachmentDir()){
+        try{if(fs.existsSync(parent)&&fs.readdirSync(parent).length===0)fs.rmdirSync(parent)}catch{}
+      }
+    }
     return {success:true};
   }catch(error){return {success:false,reason:error.message}}
 });
