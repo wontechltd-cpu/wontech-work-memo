@@ -303,25 +303,54 @@ async function openPrintPreview(name,html,options={}){
   return {success:true,preview:true};
 }
 
+function storeQuoteAttachmentFromPath(source,oldStoredName=''){
+  try{
+    if(!source||!path.isAbsolute(source)||!fs.existsSync(source)){
+      return {success:false,reason:'선택한 파일을 찾을 수 없습니다.'};
+    }
+    const stat=fs.statSync(source);
+    if(!stat.isFile())return {success:false,reason:'파일만 첨부할 수 있습니다.'};
+    if(!excelAttachmentExtOk(source)){
+      return {success:false,reason:'Excel 파일(.xlsx/.xls/.xlsm)만 첨부할 수 있습니다.'};
+    }
+    if(stat.size>100*1024*1024){
+      return {success:false,reason:'첨부파일은 100MB 이하만 사용할 수 있습니다.'};
+    }
+
+    const ext=path.extname(source).toLowerCase();
+    const storedName=`${Date.now()}_${Math.random().toString(36).slice(2,10)}${ext}`;
+    const dest=quoteAttachmentPath(storedName);
+    fs.copyFileSync(source,dest);
+
+    if(oldStoredName){
+      const oldPath=quoteAttachmentPath(oldStoredName);
+      try{
+        if(oldPath&&oldPath!==dest&&fs.existsSync(oldPath))fs.unlinkSync(oldPath);
+      }catch{}
+    }
+
+    return {
+      success:true,
+      originalName:path.basename(source),
+      storedName,
+      size:stat.size
+    };
+  }catch(error){
+    return {success:false,reason:error.message};
+  }
+}
+
 ipcMain.handle('quote-attach-file',async(_,quoteId,oldStoredName='')=>{
   const r=await dialog.showOpenDialog(win,{
     title:'본 견적서 Excel 파일 선택',properties:['openFile'],
     filters:[{name:'Excel 견적서',extensions:['xlsx','xls','xlsm']}]
   });
   if(r.canceled||!r.filePaths?.[0])return {canceled:true};
-  const source=r.filePaths[0];
-  if(!excelAttachmentExtOk(source))return {success:false,reason:'Excel 파일(.xlsx/.xls/.xlsm)만 첨부할 수 있습니다.'};
-  const stat=fs.statSync(source);
-  if(stat.size>100*1024*1024)return {success:false,reason:'첨부파일은 100MB 이하만 사용할 수 있습니다.'};
-  const ext=path.extname(source).toLowerCase();
-  const storedName=`${Date.now()}_${Math.random().toString(36).slice(2,10)}${ext}`;
-  const dest=quoteAttachmentPath(storedName);
-  fs.copyFileSync(source,dest);
-  if(oldStoredName){
-    const oldPath=quoteAttachmentPath(oldStoredName);
-    try{if(oldPath&&oldPath!==dest&&fs.existsSync(oldPath))fs.unlinkSync(oldPath)}catch{}
-  }
-  return {success:true,originalName:path.basename(source),storedName,size:stat.size};
+  return storeQuoteAttachmentFromPath(r.filePaths[0],oldStoredName);
+});
+
+ipcMain.handle('quote-attach-dropped-file',async(_,quoteId,oldStoredName='',source='')=>{
+  return storeQuoteAttachmentFromPath(source,oldStoredName);
 });
 
 ipcMain.handle('quote-open-file',async(_,storedName)=>{
