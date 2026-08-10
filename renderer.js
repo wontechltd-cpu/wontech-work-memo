@@ -299,7 +299,7 @@ function addQuote(){
   const all=getQuotes();
   all.push({
     id:crypto.randomUUID(),title:'',unit:'EA',qty:1,quoteUnit:0,bidUnit:0,
-    company:'',dept:'',person:'',contactId:'',submitDate:'',bidDate:'',bidStatus:'무',note:''
+    company:'',dept:'',person:'',contactId:'',submitDate:'',bidDate:'',bidStatus:'무',note:'',attachment:null
   });
   saveQuotes(all);
   quoteView='active';
@@ -357,7 +357,18 @@ function makeQuoteRow(q,index){
       <option value="유" ${q.bidStatus==='유'?'selected':''}>유</option>
       <option value="CXL" ${q.bidStatus==='CXL'?'selected':''}>CXL</option>
     </select></div>
-    <div><input class="quote-note q-center" value="${esc(q.note)}" placeholder="비고"></div>`;
+    <div><input class="quote-note q-center" value="${esc(q.note)}" placeholder="비고"></div>
+    <div class="quote-attachment">
+      ${q.attachment&&q.attachment.storedName
+        ? `<div class="quote-attachment-name" title="${esc(q.attachment.originalName||'첨부 견적서')}">${esc(q.attachment.originalName||'첨부 견적서')}</div>
+           <div class="quote-attachment-actions">
+             <button class="quote-open-button" type="button">열기</button>
+             <button class="quote-attach-button" type="button">교체</button>
+             <button class="quote-remove-button" type="button">삭제</button>
+           </div>`
+        : `<div class="quote-attachment-empty">첨부 없음</div>
+           <div class="quote-attachment-actions"><button class="quote-attach-button" type="button">첨부</button></div>`}
+    </div>`;
 
   r.querySelector('.quote-title').oninput=e=>patchQuote(q.id,{title:e.target.value});
   r.querySelector('.quote-unit').onchange=e=>patchQuote(q.id,{unit:e.target.value});
@@ -400,6 +411,41 @@ function makeQuoteRow(q,index){
   r.querySelector('.submit-date').onchange=e=>patchQuote(q.id,{submitDate:e.target.value});
   r.querySelector('.bid-date').onchange=e=>patchQuote(q.id,{bidDate:e.target.value});
   r.querySelector('.quote-note').oninput=e=>patchQuote(q.id,{note:e.target.value});
+
+  r.querySelector('.quote-attach-button')?.addEventListener('click',async()=>{
+    try{
+      const oldStoredName=q.attachment?.storedName||'';
+      const result=await window.desk.attachQuoteFile(q.id,oldStoredName);
+      if(!result||result.canceled)return;
+      if(result.success===false){showToast(result.reason||'견적서를 첨부하지 못했습니다.');return}
+      patchQuote(q.id,{attachment:{
+        originalName:result.originalName,
+        storedName:result.storedName,
+        size:result.size||0,
+        attachedAt:new Date().toISOString()
+      }});
+      showToast(`${result.originalName} 견적서를 보관했습니다.`);
+      renderQuoteManager();
+    }catch(error){console.error(error);showToast('견적서 첨부 중 오류가 발생했습니다.')}
+  });
+
+  r.querySelector('.quote-open-button')?.addEventListener('click',async()=>{
+    try{
+      const result=await window.desk.openQuoteFile(q.attachment?.storedName||'');
+      if(result&&result.success===false)showToast(result.reason||'첨부 견적서를 열지 못했습니다.');
+    }catch(error){console.error(error);showToast('첨부 견적서를 열지 못했습니다.')}
+  });
+
+  r.querySelector('.quote-remove-button')?.addEventListener('click',async()=>{
+    try{
+      const result=await window.desk.removeQuoteFile(q.attachment?.storedName||'');
+      if(result&&result.success===false){showToast(result.reason||'첨부 견적서를 삭제하지 못했습니다.');return}
+      patchQuote(q.id,{attachment:null});
+      showToast('첨부 견적서를 삭제했습니다.');
+      renderQuoteManager();
+    }catch(error){console.error(error);showToast('첨부 견적서를 삭제하지 못했습니다.')}
+  });
+
   r.querySelector('.bid-status').onchange=e=>{
     const status=e.target.value;
     patchQuote(q.id,{bidStatus:status});
@@ -537,7 +583,7 @@ function printableQuotesHtml(){
         <div class="money">${money(q.bidUnit)}</div><div class="money">${money(bidAmount)}</div>
         <div>${esc(q.company)}</div><div>${esc(q.dept)}</div><div>${esc(q.person)}</div>
         <div>${esc(q.submitDate)}</div><div>${esc(q.bidDate)}</div><div>${esc(q.bidStatus||'무')}</div>
-        <div>${esc(q.note)}</div>
+        <div>${esc(q.note)}</div><div>${q.attachment?.storedName?'있음':'-'}</div>
       </div>`;
   }).join('');
 
@@ -555,13 +601,44 @@ function printableQuotesHtml(){
           <div>NO</div><div>견적제목</div><div>단위</div><div>수량</div>
           <div>견적단가</div><div>견적금액</div><div>입찰단가</div><div>입찰금액</div>
           <div>요청회사</div><div>부서</div><div>담당자</div>
-          <div>제출일자</div><div>입찰일자</div><div>입찰유무</div><div>비고</div>
+          <div>제출일자</div><div>입찰일자</div><div>입찰유무</div><div>비고</div><div>첨부</div>
         </div>
         ${rows||'<div class="quote-print-empty">등록된 견적이 없습니다.</div>'}
       </div>
       <div class="quote-print-footer">금액 단위: 원(₩) / A4 가로</div>
     </section>`;
 }
+async function exportQuotesExcel(){
+  if(quoteView==='contacts'){
+    showToast('담당자 편집 화면은 Excel 저장 대상이 아닙니다.');
+    return;
+  }
+  const rows=currentQuotes().map((q,i)=>({
+    no:i+1,
+    title:q.title||'',
+    unit:q.unit||'',
+    qty:numberValue(q.qty),
+    quoteUnit:numberValue(q.quoteUnit),
+    quoteAmount:numberValue(q.qty)*numberValue(q.quoteUnit),
+    bidUnit:numberValue(q.bidUnit),
+    bidAmount:numberValue(q.qty)*numberValue(q.bidUnit),
+    company:q.company||'',
+    dept:q.dept||'',
+    person:q.person||'',
+    submitDate:q.submitDate||'',
+    bidDate:q.bidDate||'',
+    bidStatus:q.bidStatus||'무',
+    note:q.note||'',
+    attachment:q.attachment?.originalName||''
+  }));
+  const name=`WONTECH_견적관리_${quoteViewName().replaceAll(' ','_')}`;
+  try{
+    const result=await window.desk.exportQuotesExcel(name,rows);
+    if(result&&result.success===false)showToast(result.reason||'Excel 저장에 실패했습니다.');
+    else if(result&&!result.canceled)showToast('견적관리 Excel 파일을 저장했습니다.');
+  }catch(error){console.error(error);showToast('Excel 저장 중 오류가 발생했습니다.')}
+}
+
 async function outputMemo(fn){
   const checklistMode=isChecklistOpen();
   const k=active||workDate();
@@ -620,6 +697,7 @@ $('#quoteCxlTab').onclick=()=>{quoteView='cxl';renderQuoteManager()};
 $('#quoteContactTab').onclick=()=>{quoteView='contacts';renderQuoteManager()};
 $('#addQuote').onclick=addQuote;
 $('#addContact').onclick=addContact;
+$('#quoteExcel').onclick=exportQuotesExcel;
 $('#quoteJpg').onclick=()=>outputQuotes(window.desk.jpg);
 $('#quotePdf').onclick=()=>outputQuotes(window.desk.pdf);
 $('#quotePrint').onclick=()=>outputQuotes(window.desk.print);
