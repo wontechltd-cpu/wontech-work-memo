@@ -327,3 +327,26 @@ button{cursor:pointer}
   .check-window-head{align-items:flex-start}
   .check-window-actions{flex-wrap:wrap;justify-content:flex-end}
 }
+
+
+/* v13: 견적관리 독립창 */
+body.quote-only-window{
+  background:#eef1f3;
+  overflow:hidden;
+}
+body.quote-only-window > .toolbar,
+body.quote-only-window > #days,
+body.quote-only-window > .older,
+body.quote-only-window > #checkModal{
+  display:none!important;
+}
+body.quote-only-window .quote-modal{
+  padding:0;
+  background:#eef1f3;
+}
+body.quote-only-window .quote-window{
+  width:100vw;
+  height:100vh;
+  border-radius:0;
+  box-shadow:none;
+}
