@@ -259,10 +259,10 @@ function printableDocument(content,{preview=false,title='WONTECH 출력 미리�
       .quote-print-brand .brand-logo{width:42mm}
       .quote-print-brand>div{margin-left:auto;text-align:right}
       .quote-print-brand strong{display:block;font-size:15pt}.quote-print-brand small{display:block;margin-top:1mm;font-size:7pt;color:#666}
-      .quote-print-table{border:.25mm solid #444;font-size:6.6pt}
+      .quote-print-table{max-width:281mm;border:.25mm solid #444;font-size:6.6pt}
       .quote-print-row{
         display:grid;
-        grid-template-columns:7mm 43mm 10mm 10mm 18mm 20mm 18mm 20mm 20mm 15mm 15mm 19mm 19mm 13mm 22mm 12mm;
+        grid-template-columns:var(--quote-grid,7mm 48mm 10mm 10mm 18mm 20mm 18mm 20mm 21mm 15mm 15mm 19mm 19mm 13mm 28mm);
         border-bottom:.2mm solid #999
       }
       .quote-print-row:last-child{border-bottom:0}
