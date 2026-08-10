@@ -476,12 +476,12 @@ function makeQuoteRow(q,index){
       const files=Array.from(e.dataTransfer?.files||[]);
       if(!files.length)return;
 
-      const file=files.find(f=>/\.(xlsx|xls|xlsm)$/i.test(f.name||''));
+      const file=files.find(f=>/\.(xlsx|xls|xlsm|jpg|jpeg|pdf)$/i.test(f.name||''));
       if(!file){
-        showToast('Excel 파일(.xlsx/.xls/.xlsm)만 첨부할 수 있습니다.');
+        showToast('Excel, JPG, PDF 파일만 첨부할 수 있습니다.');
         return;
       }
-      if(files.length>1)showToast('여러 파일 중 첫 번째 Excel 파일을 첨부합니다.');
+      if(files.length>1)showToast('여러 파일 중 첫 번째 지원 형식 파일을 첨부합니다.');
 
       try{
         const oldStoredName=q.attachment?.storedName||'';
@@ -497,7 +497,7 @@ function makeQuoteRow(q,index){
           size:result.size||0,
           attachedAt:new Date().toISOString()
         }});
-        showToast(`${result.originalName} 견적서를 드래그 첨부했습니다.`);
+        showToast(`${result.originalName} 파일을 드래그 첨부했습니다.`);
         renderQuoteManager();
       }catch(error){
         console.error(error);
