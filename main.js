@@ -3,9 +3,9 @@ const path=require('path');
 const fs=require('fs');
 
 let win;
+let quoteWin;
 const printPreviewWindows=new Set();
 const NORMAL_SIZE={width:420,height:650};
-const QUOTE_SIZE={width:1480,height:860};
 
 function create(){
   win=new BrowserWindow({
@@ -18,29 +18,67 @@ function create(){
     webPreferences:{preload:path.join(__dirname,'preload.js')}
   });
   win.loadFile('index.html');
+
+  // 업무메모 창을 닫으면 함께 열린 견적관리 창도 정리합니다.
+  win.on('closed',()=>{
+    if(quoteWin&&!quoteWin.isDestroyed())quoteWin.close();
+    win=null;
+  });
 }
+
+function createQuoteWindow(){
+  if(quoteWin&&!quoteWin.isDestroyed()){
+    if(quoteWin.isMinimized())quoteWin.restore();
+    quoteWin.show();
+    quoteWin.focus();
+    return quoteWin;
+  }
+
+  quoteWin=new BrowserWindow({
+    show:false,
+    width:1480,
+    height:860,
+    minWidth:1000,
+    minHeight:650,
+    autoHideMenuBar:true,
+    backgroundColor:'#eef1f3',
+    title:'WONTECH 견적관리',
+    webPreferences:{preload:path.join(__dirname,'preload.js')}
+  });
+
+  // 같은 index.html을 사용하되 query로 '견적관리 전용 창'임을 구분합니다.
+  // 같은 앱/세션을 사용하므로 기존 견적 데이터 저장 구조를 그대로 사용합니다.
+  quoteWin.loadFile('index.html',{query:{view:'quotes'}});
+  quoteWin.on('closed',()=>{quoteWin=null;});
+  quoteWin.once('ready-to-show',()=>{
+    if(!quoteWin||quoteWin.isDestroyed())return;
+    quoteWin.maximize();
+    quoteWin.show();
+    quoteWin.focus();
+  });
+  return quoteWin;
+}
+
+function senderWindow(event){
+  try{return BrowserWindow.fromWebContents(event.sender)||win}
+  catch{return win}
+}
+
 app.whenReady().then(create);
 app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit()});
 
-ipcMain.handle('top',(_,v)=>{win.setAlwaysOnTop(v);return win.isAlwaysOnTop()});
-ipcMain.handle('quote-window',(_,open)=>{
+ipcMain.handle('top',(_,v)=>{
   if(!win||win.isDestroyed())return false;
+  win.setAlwaysOnTop(v);
+  return win.isAlwaysOnTop();
+});
 
+ipcMain.handle('quote-window',(_,open)=>{
   if(open){
-    // 견적관리에서는 가로 스크롤 없이 최대한 많은 칸을 보기 위해
-    // 프로그램 창을 사용 가능한 모니터 영역까지 자동 최대화합니다.
-    if(!win.isMaximized())win.maximize();
-    win.focus();
+    createQuoteWindow();
     return true;
   }
-
-  // 견적관리 닫기 → 일반 업무메모 크기로 복귀
-  if(win.isMaximized())win.unmaximize();
-  setTimeout(()=>{
-    if(!win||win.isDestroyed())return;
-    win.setSize(NORMAL_SIZE.width,NORMAL_SIZE.height,true);
-    win.center();
-  },120);
+  if(quoteWin&&!quoteWin.isDestroyed())quoteWin.close();
   return true;
 });
 
@@ -383,8 +421,9 @@ function storeQuoteAttachmentFromPath(source,quoteId,oldStoredName=''){
   }
 }
 
-ipcMain.handle('quote-attach-file',async(_,quoteId,oldStoredName='')=>{
-  const r=await dialog.showOpenDialog(win,{
+ipcMain.handle('quote-attach-file',async(event,quoteId,oldStoredName='')=>{
+  const parent=senderWindow(event);
+  const r=await dialog.showOpenDialog(parent,{
     title:'견적 첨부파일 선택',properties:['openFile'],
     filters:[
       {name:'견적 첨부파일',extensions:['xlsx','xls','xlsm','jpg','jpeg','pdf']},
@@ -471,8 +510,9 @@ ipcMain.handle('quote-remove-file',async(_,storedName)=>{
   }catch(error){return {success:false,reason:error.message}}
 });
 
-ipcMain.handle('quote-export-excel',async(_,name,rows=[])=>{
-  const r=await dialog.showSaveDialog(win,{
+ipcMain.handle('quote-export-excel',async(event,name,rows=[])=>{
+  const parent=senderWindow(event);
+  const r=await dialog.showSaveDialog(parent,{
     defaultPath:name+'.xlsx',filters:[{name:'Excel 통합문서',extensions:['xlsx']}]
   });
   if(r.canceled)return {canceled:true};
@@ -482,8 +522,9 @@ ipcMain.handle('quote-export-excel',async(_,name,rows=[])=>{
   }catch(error){return {success:false,reason:error.message}}
 });
 
-ipcMain.handle('jpg',async(_,name,html,options={})=>{
-  const r=await dialog.showSaveDialog(win,{defaultPath:name+'.jpg',filters:[{name:'JPG 이미지',extensions:['jpg']}]});
+ipcMain.handle('jpg',async(event,name,html,options={})=>{
+  const parent=senderWindow(event);
+  const r=await dialog.showSaveDialog(parent,{defaultPath:name+'.jpg',filters:[{name:'JPG 이미지',extensions:['jpg']}]});
   if(r.canceled)return false;
   let child;
   try{
@@ -504,8 +545,9 @@ ipcMain.handle('jpg',async(_,name,html,options={})=>{
   }
 });
 
-ipcMain.handle('pdf',async(_,name,html,options={})=>{
-  const r=await dialog.showSaveDialog(win,{defaultPath:name+'.pdf',filters:[{name:'PDF',extensions:['pdf']}]});
+ipcMain.handle('pdf',async(event,name,html,options={})=>{
+  const parent=senderWindow(event);
+  const r=await dialog.showSaveDialog(parent,{defaultPath:name+'.pdf',filters:[{name:'PDF',extensions:['pdf']}]});
   if(r.canceled)return false;
   let child;
   try{
