@@ -489,8 +489,18 @@ function makeQuoteRow(q,index){
 
   r.querySelector('.quote-open-button')?.addEventListener('click',async()=>{
     try{
-      const result=await window.desk.openQuoteFile(q.attachment?.storedName||'');
-      if(result&&result.success===false)showToast(result.reason||'첨부 견적서를 열지 못했습니다.');
+      const result=await window.desk.openQuoteFile(q.id,q.attachment||{});
+      if(result&&result.success===false){
+        showToast(result.reason||'첨부 견적서를 열지 못했습니다.');
+        return;
+      }
+      if(result?.migrated&&result.storedName){
+        patchQuote(q.id,{attachment:{
+          ...(q.attachment||{}),
+          originalName:result.originalName||q.attachment?.originalName||'',
+          storedName:result.storedName
+        }});
+      }
     }catch(error){console.error(error);showToast('첨부 견적서를 열지 못했습니다.')}
   });
 
