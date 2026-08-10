@@ -366,7 +366,7 @@ function makeQuoteRow(q,index){
              <button class="quote-attach-button" type="button">교체</button>
              <button class="quote-remove-button" type="button">삭제</button>
            </div>`
-        : `<div class="quote-attachment-empty">첨부 없음</div>
+        : `<div class="quote-attachment-empty">파일 놓기</div>
            <div class="quote-attachment-actions"><button class="quote-attach-button" type="button">첨부</button></div>`}
     </div>`;
 
@@ -428,6 +428,64 @@ function makeQuoteRow(q,index){
       renderQuoteManager();
     }catch(error){console.error(error);showToast('견적서 첨부 중 오류가 발생했습니다.')}
   });
+
+  const attachmentCell=r.querySelector('.quote-attachment');
+  if(attachmentCell){
+    const removeDragState=()=>attachmentCell.classList.remove('drag-over');
+
+    attachmentCell.addEventListener('dragenter',e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      attachmentCell.classList.add('drag-over');
+    });
+    attachmentCell.addEventListener('dragover',e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      if(e.dataTransfer)e.dataTransfer.dropEffect='copy';
+      attachmentCell.classList.add('drag-over');
+    });
+    attachmentCell.addEventListener('dragleave',e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      if(!attachmentCell.contains(e.relatedTarget))removeDragState();
+    });
+    attachmentCell.addEventListener('drop',async e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      removeDragState();
+
+      const files=Array.from(e.dataTransfer?.files||[]);
+      if(!files.length)return;
+
+      const file=files.find(f=>/\.(xlsx|xls|xlsm)$/i.test(f.name||''));
+      if(!file){
+        showToast('Excel 파일(.xlsx/.xls/.xlsm)만 첨부할 수 있습니다.');
+        return;
+      }
+      if(files.length>1)showToast('여러 파일 중 첫 번째 Excel 파일을 첨부합니다.');
+
+      try{
+        const oldStoredName=q.attachment?.storedName||'';
+        const result=await window.desk.attachDroppedQuoteFile(file,q.id,oldStoredName);
+        if(!result||result.canceled)return;
+        if(result.success===false){
+          showToast(result.reason||'견적서를 첨부하지 못했습니다.');
+          return;
+        }
+        patchQuote(q.id,{attachment:{
+          originalName:result.originalName,
+          storedName:result.storedName,
+          size:result.size||0,
+          attachedAt:new Date().toISOString()
+        }});
+        showToast(`${result.originalName} 견적서를 드래그 첨부했습니다.`);
+        renderQuoteManager();
+      }catch(error){
+        console.error(error);
+        showToast('드래그한 견적서를 첨부하지 못했습니다.');
+      }
+    });
+  }
 
   r.querySelector('.quote-open-button')?.addEventListener('click',async()=>{
     try{
