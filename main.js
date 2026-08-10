@@ -55,11 +55,17 @@ function safeQuoteId(value=''){
 function safeAttachmentFileName(name=''){
   const original=path.basename(String(name||'견적서.xlsx'));
   const ext=path.extname(original);
+  const extLower=ext.toLowerCase();
   const base=path.basename(original,ext)
     .replace(/[<>:"/\\|?*\x00-\x1F]/g,'_')
     .replace(/[. ]+$/g,'')
     .trim()||'견적서';
-  const safeExt=['.xlsx','.xls','.xlsm'].includes(ext.toLowerCase())?ext:'.xlsx';
+
+  // 첨부파일의 실제 확장자를 그대로 유지합니다.
+  // 예전 코드에서는 Excel 외 파일을 강제로 .xlsx로 바꿔
+  // PDF/JPG가 Excel로 열리는 문제가 있었습니다.
+  const allowedExt=['.xlsx','.xls','.xlsm','.jpg','.jpeg','.pdf'];
+  const safeExt=allowedExt.includes(extLower)?extLower:'.xlsx';
   return (base+safeExt).slice(0,180);
 }
 function quoteAttachmentPath(storedName=''){
@@ -410,6 +416,8 @@ ipcMain.handle('quote-open-file',async(_,quoteId,attachment={})=>{
 
     // 예전 버전에서 랜덤 내부명으로 저장된 기존 파일은 처음 열 때
     // 견적별 폴더 + 원래 파일명으로 자동 이전합니다.
+    // originalName이 PDF/JPG인데 과거 버전에서 storedName이 .xlsx로 저장된 경우에도
+    // 여기서 원래 확장자(.pdf/.jpg/.jpeg)로 자동 복구합니다.
     const desiredPath=quoteAttachmentRecordPath(
       quoteId,
       originalName||path.basename(filePath)
