@@ -402,13 +402,13 @@ ipcMain.handle('quote-open-file',async(_,quoteId,attachment={})=>{
     let filePath=quoteAttachmentPath(storedName);
 
     if(!filePath||!fs.existsSync(filePath)){
-      return {success:false,reason:'첨부 견적서 파일을 찾을 수 없습니다.'};
+      return {success:false,reason:'첨부파일을 찾을 수 없습니다.'};
     }
 
     let migrated=false;
     let migratedStoredName=storedName;
 
-    // v6/v7에서 랜덤 내부명으로 저장된 기존 파일은 처음 열 때
+    // 예전 버전에서 랜덤 내부명으로 저장된 기존 파일은 처음 열 때
     // 견적별 폴더 + 원래 파일명으로 자동 이전합니다.
     const desiredPath=quoteAttachmentRecordPath(
       quoteId,
@@ -420,15 +420,23 @@ ipcMain.handle('quote-open-file',async(_,quoteId,attachment={})=>{
       try{fs.unlinkSync(filePath)}catch{}
       const oldParent=path.dirname(filePath);
       if(oldParent!==quoteAttachmentDir()){
-        try{if(fs.existsSync(oldParent)&&fs.readdirSync(oldParent).length===0)fs.rmdirSync(oldParent)}catch{}
+        try{
+          if(fs.existsSync(oldParent)&&fs.readdirSync(oldParent).length===0)fs.rmdirSync(oldParent);
+        }catch{}
       }
       filePath=desiredPath;
       migrated=true;
       migratedStoredName=relativeQuoteAttachmentPath(desiredPath);
     }
 
-    const error=await shell.openPath(filePath);
-    if(error)return {success:false,reason:error};
+    // Windows에 등록된 기본 프로그램으로 파일을 엽니다.
+    // .xlsx/.xls/.xlsm -> Excel(또는 기본 스프레드시트 앱)
+    // .pdf            -> 기본 PDF 뷰어
+    // .jpg/.jpeg      -> 기본 사진 앱
+    const openError=await shell.openPath(filePath);
+    if(openError){
+      return {success:false,reason:`파일을 열지 못했습니다. ${openError}`};
+    }
 
     return {
       success:true,
