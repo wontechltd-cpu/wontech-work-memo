@@ -7,7 +7,7 @@ contextBridge.exposeInMainWorld('desk',{
     const filePath=webUtils.getPathForFile(file);
     return ipcRenderer.invoke('quote-attach-dropped-file',quoteId,oldStoredName,filePath);
   },
-  openQuoteFile:storedName=>ipcRenderer.invoke('quote-open-file',storedName),
+  openQuoteFile:(quoteId,attachment)=>ipcRenderer.invoke('quote-open-file',quoteId,attachment),
   removeQuoteFile:storedName=>ipcRenderer.invoke('quote-remove-file',storedName),
   exportQuotesExcel:(name,rows)=>ipcRenderer.invoke('quote-export-excel',name,rows),
   jpg:(name,html,options)=>ipcRenderer.invoke('jpg',name,html,options),
