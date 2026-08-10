@@ -214,6 +214,68 @@ button{cursor:pointer}
 .contact-row .contact-save{border:0;border-radius:4px;padding:6px 8px;background:#316f9f;color:#fff;font-weight:800}
 .contact-row .contact-delete{border:0;border-radius:4px;padding:6px 8px;background:#d65a5a;color:#fff;font-weight:800}
 
+
+/* 견적관리 A4 출력설정 */
+.quote-settings-modal{
+  display:none;position:fixed;inset:0;z-index:220;background:#0009;
+  align-items:center;justify-content:center;padding:14px
+}
+.quote-settings-modal.open{display:flex}
+.quote-settings-window{
+  width:min(940px,96vw);max-height:min(760px,94vh);background:#fff;
+  border-radius:10px;box-shadow:0 16px 50px #0009;overflow:hidden;
+  display:flex;flex-direction:column
+}
+.quote-settings-head{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:13px 15px;background:#253746;color:#fff
+}
+.quote-settings-head strong{display:block;font-size:18px}
+.quote-settings-head small{display:block;margin-top:3px;opacity:.82;font-size:11px}
+.quote-settings-body{padding:12px;overflow:auto;background:#f5f7f9}
+.quote-width-summary{
+  display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px
+}
+.quote-width-summary>div{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:9px 11px;background:#fff;border:1px solid #d4dde3;border-radius:6px;
+  font-size:13px
+}
+.quote-width-summary span{font-weight:900;color:#1d5d8e;font-size:15px}
+.quote-width-summary .over{color:#c33}
+.quote-width-grid{
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px
+}
+.quote-width-item{
+  display:grid;grid-template-columns:1fr 82px;align-items:center;gap:7px;
+  padding:7px 8px;background:#fff;border:1px solid #d7dfe5;border-radius:6px
+}
+.quote-width-item label{font-weight:800;font-size:12px;color:#334d5d}
+.quote-width-input-wrap{display:flex;align-items:center;gap:3px}
+.quote-width-input{
+  width:58px;padding:6px 4px;border:1px solid #9fb0bb;border-radius:4px;
+  text-align:right;font-size:12px;font-weight:800
+}
+.quote-width-unit{font-size:10px;color:#667}
+.quote-width-guide{
+  margin-top:10px;padding:9px 11px;background:#fff8e8;border:1px solid #ecd7ae;
+  border-radius:6px;color:#5e5b50;font-size:11px;line-height:1.55
+}
+.quote-settings-actions{
+  display:flex;justify-content:flex-end;gap:7px;padding:10px 12px;
+  border-top:1px solid #d4dde3;background:#fff
+}
+.quote-settings-actions button{
+  border:1px solid #8da0ad;border-radius:5px;padding:7px 11px;
+  background:#fff;color:#334d5d;font-size:11px;font-weight:800
+}
+.quote-settings-actions button.primary{
+  border-color:#285f8d;background:#285f8d;color:#fff
+}
+@media(max-width:800px){
+  .quote-width-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
 .toast{
   position:fixed;left:50%;bottom:20px;z-index:300;transform:translate(-50%,20px);
   background:#222;color:#fff;border-radius:6px;padding:9px 14px;
