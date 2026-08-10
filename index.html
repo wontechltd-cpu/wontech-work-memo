@@ -58,6 +58,7 @@
         </div>
         <div class="quote-window-actions">
           <button id="quoteExcel">EXCEL</button>
+          <button id="quotePrintSettings">출력설정</button>
           <button id="quoteJpg">JPG</button>
           <button id="quotePdf">PDF</button>
           <button id="quotePrint">인쇄</button>
@@ -106,7 +107,7 @@
           <b>입찰유무</b>에서 <b>유</b>를 선택하면 진행 견적에서 빠지고 ‘입찰 유 리스트’로 이동합니다.
           <b>CXL</b>을 선택하면 ‘CXL 리스트’로 이동합니다. 별도 리스트에서 <b>무</b>로 되돌리면 진행 견적으로 복귀합니다.
           견적금액과 입찰금액은 각각 <b>단가 × 수량</b>으로 자동 계산됩니다.
-          각 견적의 <b>첨부</b> 칸에는 Excel 본견적서를 버튼으로 선택하거나 마우스로 끌어다 놓아 보관·열기·교체·삭제할 수 있고, 상단 <b>EXCEL</b> 버튼으로 현재 리스트를 엑셀 파일로 저장할 수 있습니다.
+          각 견적의 <b>첨부</b> 칸에는 Excel 본견적서를 버튼으로 선택하거나 마우스로 끌어다 놓아 보관·열기·교체·삭제할 수 있고, 상단 <b>EXCEL</b> 버튼으로 현재 리스트를 엑셀 파일로 저장할 수 있습니다. <b>첨부 칸은 JPG·PDF·인쇄에서는 제외</b>되며, <b>출력설정</b>에서 A4 가로 칸 폭을 직접 조정할 수 있습니다.
         </div>
       </section>
 
@@ -130,6 +131,47 @@
           <div id="contactRows"></div>
         </div>
       </section>
+
+      <!-- 견적관리 A4 가로 출력 칸 너비 설정 -->
+      <div id="quotePrintSettingsModal" class="quote-settings-modal" aria-hidden="true">
+        <section class="quote-settings-window" role="dialog" aria-modal="true" aria-labelledby="quoteSettingsTitle">
+          <header class="quote-settings-head">
+            <div>
+              <strong id="quoteSettingsTitle">A4 가로 출력 설정</strong>
+              <small>JPG · PDF · 인쇄에 적용됩니다. 첨부 칸은 출력에서 제외됩니다.</small>
+            </div>
+            <button id="closeQuotePrintSettings" class="close-button" aria-label="닫기">×</button>
+          </header>
+
+          <div class="quote-settings-body">
+            <div class="quote-width-summary">
+              <div>
+                <b>A4 가로 사용 가능 폭</b>
+                <span>281 mm</span>
+              </div>
+              <div>
+                <b>현재 칸 합계</b>
+                <span id="quoteWidthTotal">281 mm</span>
+              </div>
+            </div>
+
+            <div id="quoteWidthRows" class="quote-width-grid"></div>
+
+            <div class="quote-width-guide">
+              숫자는 각 칸의 폭(mm)입니다. 견적제목·요청회사·비고는 넓게,
+              NO·단위·수량·입찰유무는 좁게 설정하는 것이 좋습니다.
+              합계가 281mm를 넘으면 A4 한 장에서 잘릴 수 있으므로 저장할 수 없습니다.
+            </div>
+          </div>
+
+          <footer class="quote-settings-actions">
+            <button id="quoteWidthFit">A4 폭 맞춤</button>
+            <button id="quoteWidthReset">기본값 복원</button>
+            <button id="quoteWidthSave" class="primary">저장</button>
+          </footer>
+        </section>
+      </div>
+
     </section>
   </div>
 
